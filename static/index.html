@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" id="meta-theme-color" content="#0b1120">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SWE L6 Interview Study Guide</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <!-- Passcode Keypad Lock Screen -->
+  <div id="lock-screen" class="lock-screen hidden" role="dialog" aria-modal="true" aria-labelledby="lock-title">
+    <div class="lock-card">
+      <div class="lock-header">
+        <span class="brand-badge">L6</span>
+        <h1 id="lock-title">SWE Study Guide</h1>
+        <p id="lock-subtitle" class="muted-text">Enter 4-digit passcode to unlock</p>
+      </div>
+
+      <div id="pin-dots" class="pin-dots" aria-label="Entered passcode digits">
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+      </div>
+
+      <p id="lock-message" class="lock-message" role="alert" aria-live="polite"></p>
+
+      <div id="keypad-grid" class="keypad-grid" role="group" aria-label="Numeric keypad">
+        <button class="keypad-btn" type="button" data-digit="1">1</button>
+        <button class="keypad-btn" type="button" data-digit="2">2</button>
+        <button class="keypad-btn" type="button" data-digit="3">3</button>
+        <button class="keypad-btn" type="button" data-digit="4">4</button>
+        <button class="keypad-btn" type="button" data-digit="5">5</button>
+        <button class="keypad-btn" type="button" data-digit="6">6</button>
+        <button class="keypad-btn" type="button" data-digit="7">7</button>
+        <button class="keypad-btn" type="button" data-digit="8">8</button>
+        <button class="keypad-btn" type="button" data-digit="9">9</button>
+        <button class="keypad-btn keypad-btn-action" type="button" id="btn-pin-clear">Clear</button>
+        <button class="keypad-btn" type="button" data-digit="0">0</button>
+        <button class="keypad-btn keypad-btn-action" type="button" id="btn-pin-back" aria-label="Backspace">⌫</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-shell" class="app-shell hidden">
+    <!-- Top Header -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="btn-toggle-sidebar" class="icon-btn mobile-only" type="button" aria-label="Toggle question list" title="Questions">
+          ☰
+        </button>
+        <button id="btn-home" class="brand" type="button">
+          <span class="brand-badge">L6</span>
+          <span class="brand-title desktop-only">Study Guide</span>
+        </button>
+        <select id="bank-select" class="bank-select" aria-label="Select question bank" title="Switch question bank"></select>
+        <span id="header-progress-pill" class="pill pill-muted desktop-only">0 / 12 mastered</span>
+      </div>
+
+      <div class="topbar-center">
+        <div class="timer-widget" aria-label="45-minute interview timer">
+          <span class="timer-label">Timer</span>
+          <span id="timer-display" class="timer-display">45:00</span>
+          <button id="btn-timer-toggle" class="btn btn-sm" type="button" title="Start or pause timer (t)">Start</button>
+          <button id="btn-timer-reset" class="btn btn-sm btn-ghost desktop-only" type="button" title="Reset to 45:00">Reset</button>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button id="btn-random-pick" class="btn btn-sm btn-primary" type="button" title="Pick a random unmastered question">
+          <span class="desktop-only">Random Next</span>
+          <span class="mobile-only">Next</span>
+        </button>
+        <button id="btn-shortcuts" class="icon-btn desktop-only" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
+          ?
+        </button>
+        <button id="btn-theme" class="btn btn-sm theme-btn" type="button" aria-label="Cycle color theme" title="Switch theme (Light / Dark / Midnight)">
+          ◐ <span id="theme-label" class="desktop-only">Dark</span>
+        </button>
+        <button id="btn-lock-app" class="icon-btn hidden" type="button" aria-label="Lock app" title="Lock app">
+          🔒
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="workspace">
+      <!-- Mobile backdrop -->
+      <div id="sidebar-backdrop" class="sidebar-backdrop hidden" aria-hidden="true"></div>
+
+      <!-- Sidebar -->
+      <aside id="sidebar" class="sidebar" aria-label="Questions navigation">
+        <div class="sidebar-mobile-header mobile-only">
+          <strong>Questions</strong>
+          <button id="btn-close-sidebar" class="icon-btn" type="button" aria-label="Close question list">✕</button>
+        </div>
+        <div class="sidebar-controls">
+          <div class="search-box">
+            <input
+              id="search-input"
+              type="search"
+              placeholder="Search title, ID, topic, text..."
+              autocomplete="off"
+              aria-label="Search questions"
+            >
+          </div>
+
+          <div class="filter-grid">
+            <select id="filter-status" aria-label="Filter by study status">
+              <option value="all">All Statuses</option>
+              <option value="not_started">Not Started</option>
+              <option value="studying">Studying</option>
+              <option value="needs_review">Needs Review</option>
+              <option value="mastered">Mastered</option>
+              <option value="bookmarked">Bookmarked ★</option>
+            </select>
+
+            <select id="filter-domain" aria-label="Filter by domain">
+              <option value="all">All Domains</option>
+            </select>
+
+            <select id="filter-skill" aria-label="Filter by skill">
+              <option value="all">All Skills</option>
+            </select>
+
+            <select id="filter-topic" aria-label="Filter by topic">
+              <option value="all">All Topics</option>
+            </select>
+          </div>
+
+          <div class="sidebar-toggles-row">
+            <label class="checkbox-inline">
+              <input id="filter-l6-only" type="checkbox">
+              <span>L6 rubric</span>
+            </label>
+            <label class="checkbox-inline">
+              <input id="filter-l7-only" type="checkbox">
+              <span>L7 rubric</span>
+            </label>
+            <label class="checkbox-inline">
+              <input id="filter-show-hidden" type="checkbox">
+              <span id="label-show-hidden">Show hidden</span>
+            </label>
+          </div>
+
+          <div class="sidebar-meta-row">
+            <span id="filtered-count" class="muted-text">Loading...</span>
+            <select id="sort-by" class="select-compact" aria-label="Sort questions">
+              <option value="default">Default order</option>
+              <option value="confidence_asc">Lowest confidence</option>
+              <option value="recent">Recently studied</option>
+              <option value="title">Title A–Z</option>
+              <option value="id_desc">Newest ID</option>
+            </select>
+          </div>
+
+          <div class="sidebar-count-row">
+            <span></span>
+            <button id="btn-clear-filters" class="link-btn" type="button">Reset filters</button>
+          </div>
+        </div>
+
+        <nav id="question-list" class="question-list" aria-label="Question list"></nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main id="main-content" class="main-content" tabindex="-1">
+        <!-- Dashboard View -->
+        <section id="dashboard-view" class="dashboard-view">
+          <div class="dash-hero">
+            <div>
+              <h1 id="dash-hero-title">Interview Study Guide</h1>
+              <p id="dash-hero-subtitle" class="subtitle">
+                Active interview questions with progressive hints, solutions, level-calibrated rubrics, and a persistent Gemini AI coach.
+              </p>
+            </div>
+            <div class="dash-hero-actions">
+              <button id="btn-start-sysarch" class="btn btn-primary" type="button">Systems Architecture</button>
+              <button id="btn-start-dsa" class="btn" type="button">Algorithms &amp; Coding</button>
+              <button id="btn-start-review" class="btn" type="button">Review Queue</button>
+            </div>
+          </div>
+
+          <div class="stats-grid" id="stats-grid"></div>
+
+          <div class="dash-columns">
+            <div class="card">
+              <h2>Progress by Skill</h2>
+              <div id="skill-breakdown" class="breakdown-list"></div>
+            </div>
+            <div class="card">
+              <h2>Progress by Domain</h2>
+              <div id="domain-breakdown" class="breakdown-list"></div>
+            </div>
+          </div>
+
+          <div class="card dash-footer-card">
+            <div class="dash-footer-row">
+              <div>
+                <p id="confidentiality-notice" class="muted-text" style="margin:0 0 4px;"></p>
+                <p id="storage-notice" class="muted-text" style="margin:0;"></p>
+              </div>
+              <div class="dash-footer-actions">
+                <button id="btn-export-progress" class="btn btn-sm" type="button">Export Progress</button>
+                <button id="btn-open-reset" class="btn btn-sm btn-danger-ghost" type="button">Reset Progress</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Question Detail View -->
+        <article id="question-view" class="question-view hidden">
+          <div class="q-header">
+            <div class="q-header-top">
+              <div class="q-breadcrumb">
+                <button id="btn-back-dash" class="link-btn" type="button">← Dashboard</button>
+                <span class="sep">/</span>
+                <span id="q-id-badge" class="code-badge"></span>
+                <span id="q-domain-badge" class="pill"></span>
+                <a id="q-corp-link" class="ext-link" target="_blank" rel="noopener noreferrer">go/iq ↗</a>
+              </div>
+              <div class="q-nav-btns">
+                <button id="btn-prev-q" class="btn btn-sm" type="button" title="Previous question (k)">← Prev</button>
+                <button id="btn-next-q" class="btn btn-sm" type="button" title="Next question (j)">Next →</button>
+              </div>
+            </div>
+
+            <h1 id="q-title" class="q-title"></h1>
+
+            <div class="q-tags-row" id="q-tags"></div>
+
+            <div class="q-controls-bar">
+              <div class="control-group">
+                <label for="q-status-select" class="control-label">Status</label>
+                <select id="q-status-select" class="select-status">
+                  <option value="not_started">Not Started</option>
+                  <option value="studying">Studying</option>
+                  <option value="needs_review">Needs Review</option>
+                  <option value="mastered">Mastered</option>
+                </select>
+              </div>
+
+              <div class="control-group">
+                <span class="control-label">Confidence</span>
+                <div id="q-confidence-stars" class="star-rating" role="radiogroup" aria-label="Confidence rating"></div>
+              </div>
+
+              <button id="btn-bookmark" class="btn btn-sm" type="button" title="Toggle bookmark (b)">☆ Bookmark</button>
+              <button id="btn-hide-question" class="btn btn-sm" type="button" title="Hide or unhide question (h)">Hide</button>
+              <span id="save-indicator" class="save-indicator" aria-live="polite"></span>
+            </div>
+          </div>
+
+          <!-- Section Tabs -->
+          <div class="tabs-bar" role="tablist" aria-label="Question sections">
+            <button class="tab-btn active" role="tab" aria-selected="true" data-tab="problem" type="button">
+              1. Problem
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="hints" type="button">
+              2. Hints
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="solution" type="button">
+              3. Solution
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="rubric" type="button">
+              4. L6 Rubric
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="guide" type="button">
+              5. Study Guide
+            </button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="notes" type="button">
+              6. Notes
+            </button>
+            <button class="tab-btn tab-btn-gemini" role="tab" aria-selected="false" data-tab="gemini" type="button">
+              ✦ 7. Ask Gemini
+            </button>
+          </div>
+
+          <div id="tab-panels" class="tab-panels">
+            <section id="panel-problem" class="tab-panel" role="tabpanel"></section>
+            <section id="panel-hints" class="tab-panel hidden" role="tabpanel"></section>
+            <section id="panel-solution" class="tab-panel hidden" role="tabpanel"></section>
+            <section id="panel-rubric" class="tab-panel hidden" role="tabpanel"></section>
+            <section id="panel-guide" class="tab-panel hidden" role="tabpanel"></section>
+            <section id="panel-notes" class="tab-panel hidden" role="tabpanel">
+              <div class="notes-layout">
+                <div class="notes-editor-wrap">
+                  <div class="notes-header">
+                    <h3>Personal Study Notes</h3>
+                    <span id="notes-storage-hint" class="muted-text">Auto-saved</span>
+                  </div>
+                  <textarea
+                    id="q-notes-input"
+                    class="notes-textarea"
+                    placeholder="Jot down your architecture outline, trade-offs, complexity analysis, or L6 talking points..."
+                  ></textarea>
+                </div>
+                <div id="related-questions-box" class="related-box hidden">
+                  <h3>Related Questions</h3>
+                  <div id="related-questions-list" class="related-list"></div>
+                </div>
+              </div>
+            </section>
+            <section id="panel-gemini" class="tab-panel hidden" role="tabpanel">
+              <div class="gemini-shell">
+                <div class="gemini-toolbar">
+                  <div class="gemini-toolbar-left">
+                    <span class="gemini-badge">✦ Gemini Coach</span>
+                    <div class="segmented" role="group" aria-label="Coach mode">
+                      <button id="btn-coach-tutor" class="seg-btn active" type="button" data-coach="tutor">
+                        Full Tutor
+                      </button>
+                      <button id="btn-coach-socratic" class="seg-btn" type="button" data-coach="socratic">
+                        Socratic (No Spoilers)
+                      </button>
+                    </div>
+                  </div>
+                  <button id="btn-clear-chat" class="btn btn-sm btn-danger-ghost" type="button">
+                    Clear Thread
+                  </button>
+                </div>
+
+                <div class="quick-prompts" id="quick-prompts">
+                  <button class="chip-btn" type="button" data-prompt="Give me a nudge or hint without spoiling the full solution.">
+                    Hint (no spoilers)
+                  </button>
+                  <button class="chip-btn" type="button" data-prompt="What specifically separates an L6 answer from an L5 answer on this question?">
+                    L5 vs L6 bar
+                  </button>
+                  <button class="chip-btn" type="button" data-prompt="Walk me through the optimal design/algorithm, key trade-offs, and failure modes.">
+                    Optimal walkthrough
+                  </button>
+                  <button class="chip-btn" type="button" data-prompt="Act as a Google L6 interviewer and ask me one tough follow-up question on this problem.">
+                    Quiz me (L6 follow-up)
+                  </button>
+                </div>
+
+                <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+
+                <form id="chat-form" class="chat-composer">
+                  <textarea
+                    id="chat-input"
+                    class="chat-input"
+                    rows="2"
+                    placeholder="Ask Gemini about this question, paste your design for critique, or explore trade-offs..."
+                    aria-label="Ask Gemini a question"
+                  ></textarea>
+                  <button id="btn-chat-send" class="btn btn-primary chat-send-btn" type="submit">
+                    Send
+                  </button>
+                </form>
+              </div>
+            </section>
+          </div>
+        </article>
+      </main>
+    </div>
+  </div>
+
+  <!-- Native Dialog: Keyboard Shortcuts -->
+  <dialog id="dialog-shortcuts" class="modal-dialog" aria-labelledby="shortcuts-title">
+    <div class="dialog-header">
+      <h2 id="shortcuts-title">Keyboard Shortcuts</h2>
+      <button class="icon-btn" data-close-dialog="dialog-shortcuts" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body">
+      <dl class="shortcut-list">
+        <div><dt><kbd>/</kbd></dt><dd>Focus search box</dd></div>
+        <div><dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / Previous question</dd></div>
+        <div><dt><kbd>1</kbd> – <kbd>7</kbd></dt><dd>Switch tabs (Problem, Hints, Solution, L6 Rubric, Study Guide, Notes, Ask Gemini)</dd></div>
+        <div><dt><kbd>b</kbd></dt><dd>Bookmark / Unbookmark current question</dd></div>
+        <div><dt><kbd>h</kbd></dt><dd>Hide / Unhide current question</dd></div>
+        <div><dt><kbd>t</kbd></dt><dd>Start / Pause 45-minute mock timer</dd></div>
+        <div><dt><kbd>?</kbd></dt><dd>Show this shortcuts guide</dd></div>
+        <div><dt><kbd>Esc</kbd></dt><dd>Close dialogs / blur input</dd></div>
+      </dl>
+    </div>
+  </dialog>
+
+  <!-- Native Dialog: Reset Progress Confirmation -->
+  <dialog id="dialog-reset" class="modal-dialog" aria-labelledby="reset-title">
+    <div class="dialog-header">
+      <h2 id="reset-title">Reset All Study Progress?</h2>
+      <button class="icon-btn" data-close-dialog="dialog-reset" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p>This will permanently clear all question statuses, confidence ratings, bookmarks, and personal notes.</p>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn" data-close-dialog="dialog-reset" type="button">Cancel</button>
+      <button id="btn-confirm-reset" class="btn btn-danger" type="button">Yes, Reset Everything</button>
+    </div>
+  </dialog>
+
+  <!-- Native Dialog: Clear Gemini Chat Thread -->
+  <dialog id="dialog-clear-chat" class="modal-dialog" aria-labelledby="clear-chat-title">
+    <div class="dialog-header">
+      <h2 id="clear-chat-title">Clear Gemini Conversation?</h2>
+      <button class="icon-btn" data-close-dialog="dialog-clear-chat" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p>This will delete the saved Gemini conversation thread for this question.</p>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn" data-close-dialog="dialog-clear-chat" type="button">Cancel</button>
+      <button id="btn-confirm-clear-chat" class="btn btn-danger" type="button">Clear Thread</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

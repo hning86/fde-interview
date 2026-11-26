@@ -1,0 +1,12 @@
+[project]
+name = "swe6-study-guide"
+version = "0.2.0"
+description = "SWE L6 Interview Study Guide with GCS persistence and Gemini AI Coach"
+requires-python = ">=3.11"
+dependencies = [
+    "google-cloud-storage>=2.18.0",
+    "google-genai>=1.10.0",
+]
+
+[project.scripts]
+swe6-study-guide = "server:main"
