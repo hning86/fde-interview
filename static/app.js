@@ -165,6 +165,70 @@ function getProgress(qid) {
   };
 }
 
+/* ---------- Reading Position & Last View Memory ---------- */
+function readScrollMap() {
+  try {
+    const raw = localStorage.getItem("swe6_scroll_positions");
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveScrollPosition(bank, qid, tab, scrollTop) {
+  if (!bank || qid === null || !tab) return;
+  const map = readScrollMap();
+  map[`${bank}:${qid}:${tab}`] = Math.max(0, Math.round(scrollTop));
+  try {
+    localStorage.setItem("swe6_scroll_positions", JSON.stringify(map));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+function getSavedScrollPosition(bank, qid, tab) {
+  const map = readScrollMap();
+  const val = map[`${bank}:${qid}:${tab}`];
+  return typeof val === "number" && val > 0 ? val : 0;
+}
+
+function saveLastView(bank, qid, tab) {
+  if (!bank) return;
+  const key = `swe6_last_view_${bank}`;
+  try {
+    if (qid === null) {
+      localStorage.removeItem(key);
+    } else {
+      localStorage.setItem(key, JSON.stringify({ qid, tab: tab || "guide" }));
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function getLastView(bank) {
+  try {
+    const raw = localStorage.getItem(`swe6_last_view_${bank}`);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && Number.isInteger(parsed.qid)) {
+      return parsed;
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+function restoreScrollForCurrentView() {
+  const mainEl = document.getElementById("main-content");
+  if (!mainEl || state.activeQuestionId === null) return;
+  const savedTop = getSavedScrollPosition(state.activeBank, state.activeQuestionId, state.activeTab);
+  requestAnimationFrame(() => {
+    mainEl.scrollTo({ top: savedTop, behavior: "instant" });
+  });
+}
+
 /* ---------- Mobile Sidebar Drawer ---------- */
 function setSidebarOpen(open) {
   el.sidebar.classList.toggle("open", open);
@@ -282,7 +346,12 @@ async function switchBank(nextBankId) {
   populateFilterDropdowns();
   updateHeaderProgress();
   applyFilters();
-  showDashboard();
+  const lastView = getLastView(state.activeBank);
+  if (lastView && state.questionsById.has(lastView.qid)) {
+    openQuestion(lastView.qid, lastView.tab);
+  } else {
+    showDashboard();
+  }
 }
 
 async function saveProgress(qid, patch) {
@@ -707,6 +776,7 @@ function renderDashboard() {
 function showDashboard() {
   state.activeQuestionId = null;
   state.activeQuestionDetail = null;
+  saveLastView(state.activeBank, null, null);
   el.questionView.classList.add("hidden");
   el.dashboardView.classList.remove("hidden");
   renderDashboard();
@@ -715,7 +785,7 @@ function showDashboard() {
 }
 
 /* ---------- Question Detail ---------- */
-async function openQuestion(qid) {
+async function openQuestion(qid, initialTab) {
   state.activeQuestionId = qid;
   el.dashboardView.classList.add("hidden");
   el.questionView.classList.remove("hidden");
@@ -727,9 +797,10 @@ async function openQuestion(qid) {
   const q = await res.json();
   state.activeQuestionDetail = q;
   renderQuestionDetail();
-  setActiveTab("guide");
+  const targetTab = initialTab || "guide";
+  setActiveTab(targetTab);
   loadChatThread(qid);
-  document.getElementById("main-content").scrollTo({ top: 0, behavior: "instant" });
+  restoreScrollForCurrentView();
 }
 
 function renderConfidenceStars(qid, currentValue) {
@@ -1255,6 +1326,10 @@ function setActiveTab(tabName) {
   for (const [key, panel] of Object.entries(panels)) {
     panel.classList.toggle("hidden", key !== tabName);
   }
+  if (state.activeQuestionId !== null) {
+    saveLastView(state.activeBank, state.activeQuestionId, tabName);
+    restoreScrollForCurrentView();
+  }
   if (tabName === "gemini" && state.activeQuestionId !== null) {
     renderChatMessages(state.activeQuestionId);
   }
@@ -1505,6 +1580,26 @@ function bindEvents() {
     btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
   });
 
+  // Persist scroll position per (bank, question, tab) so we jump back to the last section
+  const mainEl = document.getElementById("main-content");
+  if (mainEl) {
+    let scrollSaveTimer = null;
+    mainEl.addEventListener(
+      "scroll",
+      () => {
+        if (state.activeQuestionId === null) return;
+        const bank = state.activeBank;
+        const qid = state.activeQuestionId;
+        const tab = state.activeTab;
+        clearTimeout(scrollSaveTimer);
+        scrollSaveTimer = setTimeout(() => {
+          saveScrollPosition(bank, qid, tab, mainEl.scrollTop);
+        }, 150);
+      },
+      { passive: true }
+    );
+  }
+
   // Keyboard shortcuts
   document.addEventListener("keydown", (ev) => {
     if (!state.authenticated) return;
@@ -1711,8 +1806,13 @@ async function bootAuthenticatedApp() {
     applyFilters();
 
     const hashMatch = window.location.hash.match(/^#q-(\d+)$/);
+    const lastView = getLastView(state.activeBank);
     if (hashMatch && state.questionsById.has(Number(hashMatch[1]))) {
-      openQuestion(Number(hashMatch[1]));
+      const qid = Number(hashMatch[1]);
+      const tab = lastView && lastView.qid === qid ? lastView.tab : "guide";
+      openQuestion(qid, tab);
+    } else if (lastView && state.questionsById.has(lastView.qid)) {
+      openQuestion(lastView.qid, lastView.tab);
     } else {
       showDashboard();
     }
