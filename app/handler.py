@@ -20,6 +20,8 @@ from app.config import (
     IS_CLOUD_RUN,
     MAX_BODY_BYTES,
     MAX_CHAT_MSG_LENGTH,
+    MAX_STUDY_GUIDE_BODY_BYTES,
+    MAX_STUDY_GUIDE_LENGTH,
     SESSION_TTL_SEC,
     STATIC_DIR,
     ensure_within_dir,
@@ -112,13 +114,13 @@ def make_handler(
         def _send_error_json(self, status: int, message: str) -> None:
             self._send_json(status, {"error": message})
 
-        def _read_json_body(self) -> dict[str, Any] | None:
+        def _read_json_body(self, max_bytes: int = MAX_BODY_BYTES) -> dict[str, Any] | None:
             try:
                 length = int(self.headers.get("Content-Length", "0"))
             except ValueError:
                 self._send_error_json(HTTPStatus.BAD_REQUEST, "Invalid Content-Length")
                 return None
-            if length <= 0 or length > MAX_BODY_BYTES:
+            if length <= 0 or length > max_bytes:
                 self._send_error_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Payload size out of bounds")
                 return None
             raw = self.rfile.read(length)
@@ -341,6 +343,9 @@ def make_handler(
             if path.startswith("/api/questions/") and path.endswith("/python"):
                 self._handle_generate_python(store, path[len("/api/questions/") : -len("/python")])
                 return
+            if path.startswith("/api/questions/") and path.endswith("/study-guide/save"):
+                self._handle_save_study_guide(store, path[len("/api/questions/") : -len("/study-guide/save")])
+                return
             if path.startswith("/api/questions/") and path.endswith("/study-guide"):
                 self._handle_generate_study_guide(store, path[len("/api/questions/") : -len("/study-guide")])
                 return
@@ -447,6 +452,27 @@ def make_handler(
                 )
                 return
             saved = store.save_study_guide(qid, guide_md, coach.study_guide_model)
+            self._send_json(HTTPStatus.OK, saved)
+
+        def _handle_save_study_guide(self, store: StudyGuideStore, id_part: str) -> None:
+            if not id_part.isdigit():
+                self._send_error_json(HTTPStatus.BAD_REQUEST, "Invalid question ID")
+                return
+            qid = int(id_part)
+            if not store.get_question(qid):
+                self._send_error_json(HTTPStatus.NOT_FOUND, "Question not found")
+                return
+            body = self._read_json_body(max_bytes=MAX_STUDY_GUIDE_BODY_BYTES)
+            if body is None:
+                return
+            guide_md = body.get("guide_md")
+            if not isinstance(guide_md, str) or not guide_md.strip() or len(guide_md) > MAX_STUDY_GUIDE_LENGTH:
+                self._send_error_json(
+                    HTTPStatus.BAD_REQUEST,
+                    f"guide_md must be 1..{MAX_STUDY_GUIDE_LENGTH} characters",
+                )
+                return
+            saved = store.save_study_guide(qid, guide_md, coach.study_guide_model, edited=True)
             self._send_json(HTTPStatus.OK, saved)
 
         def _handle_update_progress(self, store: StudyGuideStore, id_part: str) -> None:

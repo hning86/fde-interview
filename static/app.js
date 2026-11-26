@@ -1,4 +1,4 @@
-import { renderMarkdown } from "./markdown.js";
+import { renderMarkdown, replaceCodeBlockInMarkdown } from "./markdown.js";
 
 const STATUS_LABELS = {
   not_started: "Not Started",
@@ -1273,7 +1273,8 @@ function renderStudyGuidePanel(q) {
   const banner = document.createElement("div");
   banner.className = "generated-code-banner";
   const info = document.createElement("span");
-  info.textContent = `✦ Structured Study Guide (${q.study_guide.model || state.geminiModel}) — cached in ${state.storageLabel || "storage"}`;
+  const editedTag = q.study_guide.edited ? " · Edited" : "";
+  info.textContent = `✦ Structured Study Guide (${q.study_guide.model || state.geminiModel}${editedTag}) — click Edit on any code block to add your own comments`;
   banner.appendChild(info);
 
   const regenBtn = document.createElement("button");
@@ -1284,7 +1285,26 @@ function renderStudyGuidePanel(q) {
   banner.appendChild(regenBtn);
 
   card.appendChild(banner);
-  card.appendChild(renderMarkdown(q.study_guide.guide_md));
+  card.appendChild(
+    renderMarkdown(q.study_guide.guide_md, "", {
+      onEditCodeBlock: async (blockIndex, newCode) => {
+        const updatedMd = replaceCodeBlockInMarkdown(q.study_guide.guide_md, blockIndex, newCode);
+        const res = await fetch(apiUrl(`/api/questions/${q.id}/study-guide/save`), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": state.csrfToken,
+          },
+          body: JSON.stringify({ guide_md: updatedMd }),
+        });
+        if (!res.ok) return false;
+        const saved = await res.json();
+        q.study_guide = saved;
+        info.textContent = `✦ Structured Study Guide (${saved.model || state.geminiModel} · Edited) — click Edit on any code block to add your own comments`;
+        return true;
+      },
+    })
+  );
   el.panelGuide.appendChild(card);
 }
 

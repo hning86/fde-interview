@@ -14,6 +14,8 @@ ALLOWED_STATUSES = frozenset({"not_started", "studying", "needs_review", "master
 ALLOWED_COACH_MODES = frozenset({"socratic", "tutor"})
 
 MAX_BODY_BYTES = 64 * 1024  # 64 KB max JSON payload
+MAX_STUDY_GUIDE_BODY_BYTES = 160 * 1024  # 160 KB max for edited study guide saves
+MAX_STUDY_GUIDE_LENGTH = 100_000
 MAX_NOTE_LENGTH = 20_000
 MAX_CHAT_MSG_LENGTH = 6_000
 MAX_CHAT_HISTORY = 40

@@ -72,7 +72,7 @@ function appendInline(parent, text) {
   }
 }
 
-function createCodeBlock(codeText, language) {
+function createCodeBlock(codeText, language, blockIndex, onEditCodeBlock) {
   const wrap = document.createElement("div");
   wrap.className = "md-code-block";
 
@@ -83,13 +83,22 @@ function createCodeBlock(codeText, language) {
   langSpan.textContent = language || "code";
   header.appendChild(langSpan);
 
+  const actions = document.createElement("div");
+  actions.className = "md-code-actions";
+
+  let currentCode = codeText;
+  const pre = document.createElement("pre");
+  const code = document.createElement("code");
+  code.textContent = currentCode;
+  pre.appendChild(code);
+
   const copyBtn = document.createElement("button");
   copyBtn.type = "button";
   copyBtn.className = "md-copy-btn";
   copyBtn.textContent = "Copy";
   copyBtn.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(codeText);
+      await navigator.clipboard.writeText(currentCode);
       copyBtn.textContent = "Copied!";
       setTimeout(() => {
         copyBtn.textContent = "Copy";
@@ -98,16 +107,155 @@ function createCodeBlock(codeText, language) {
       copyBtn.textContent = "Copy failed";
     }
   });
-  header.appendChild(copyBtn);
 
-  const pre = document.createElement("pre");
-  const code = document.createElement("code");
-  code.textContent = codeText;
-  pre.appendChild(code);
+  if (typeof onEditCodeBlock === "function") {
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "md-copy-btn";
+    editBtn.textContent = "Edit";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "md-copy-btn md-save-btn hidden";
+    saveBtn.textContent = "Save";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "md-copy-btn hidden";
+    cancelBtn.textContent = "Cancel";
+
+    let editorEl = null;
+
+    const exitEditMode = () => {
+      if (editorEl) {
+        editorEl.remove();
+        editorEl = null;
+      }
+      pre.classList.remove("hidden");
+      editBtn.classList.remove("hidden");
+      saveBtn.classList.add("hidden");
+      cancelBtn.classList.add("hidden");
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+    };
+
+    editBtn.addEventListener("click", () => {
+      editorEl = document.createElement("textarea");
+      editorEl.className = "md-code-editor";
+      editorEl.value = currentCode;
+      editorEl.setAttribute("spellcheck", "false");
+      editorEl.setAttribute("autocapitalize", "off");
+      editorEl.setAttribute("autocorrect", "off");
+      editorEl.setAttribute("aria-label", `Edit ${language || "code"} snippet`);
+      const lineCount = Math.min(40, Math.max(8, currentCode.split("\n").length + 2));
+      editorEl.rows = lineCount;
+      editorEl.addEventListener("keydown", (ev) => {
+        if (ev.key === "Tab") {
+          ev.preventDefault();
+          const start = editorEl.selectionStart;
+          const end = editorEl.selectionEnd;
+          editorEl.value = editorEl.value.slice(0, start) + "  " + editorEl.value.slice(end);
+          editorEl.selectionStart = editorEl.selectionEnd = start + 2;
+        }
+      });
+
+      pre.classList.add("hidden");
+      wrap.appendChild(editorEl);
+      editBtn.classList.add("hidden");
+      saveBtn.classList.remove("hidden");
+      cancelBtn.classList.remove("hidden");
+      editorEl.focus();
+    });
+
+    cancelBtn.addEventListener("click", exitEditMode);
+
+    saveBtn.addEventListener("click", async () => {
+      if (!editorEl) return;
+      const updated = editorEl.value;
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving...";
+      try {
+        const ok = await onEditCodeBlock(blockIndex, updated);
+        if (ok !== false) {
+          currentCode = updated;
+          code.textContent = currentCode;
+          exitEditMode();
+          editBtn.textContent = "Saved ✓";
+          setTimeout(() => {
+            editBtn.textContent = "Edit";
+          }, 1500);
+        } else {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save";
+        }
+      } catch {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Retry Save";
+      }
+    });
+
+    actions.appendChild(editBtn);
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+  }
+
+  actions.appendChild(copyBtn);
+  header.appendChild(actions);
 
   wrap.appendChild(header);
   wrap.appendChild(pre);
   return wrap;
+}
+
+/**
+ * Replace the N-th fenced code block's contents inside a Markdown string,
+ * preserving its original opening/closing fence markers and indentation.
+ * @param {string} markdown
+ * @param {number} targetIndex
+ * @param {string} newCode
+ * @returns {string}
+ */
+export function replaceCodeBlockInMarkdown(markdown, targetIndex, newCode) {
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const out = [];
+  let i = 0;
+  let blockIdx = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const fenceMatch = line.match(/^(\s*)(`{3,}|~{3,})([\w#+.-]*)\s*$/);
+    if (fenceMatch) {
+      const indentStr = fenceMatch[1];
+      const fenceChar = fenceMatch[2][0];
+      const fenceLen = fenceMatch[2].length;
+      const closeRe = new RegExp(`^\\s*${fenceChar}{${fenceLen},}\\s*$`);
+      out.push(line);
+      i += 1;
+      const origCodeLines = [];
+      while (i < lines.length && !closeRe.test(lines[i])) {
+        origCodeLines.push(lines[i]);
+        i += 1;
+      }
+      if (blockIdx === targetIndex) {
+        const replacementLines = newCode.replace(/\r\n/g, "\n").split("\n");
+        for (const rl of replacementLines) {
+          out.push(indentStr && rl ? indentStr + rl : rl);
+        }
+      } else {
+        out.push(...origCodeLines);
+      }
+      if (i < lines.length) {
+        out.push(lines[i]);
+        i += 1;
+      }
+      blockIdx += 1;
+      continue;
+    }
+    out.push(line);
+    i += 1;
+  }
+
+  return out.join("\n");
 }
 
 function parseTableRow(line) {
@@ -123,9 +271,10 @@ function isTableSeparator(line) {
  * Render markdown string into a DOM container element.
  * @param {string} markdown
  * @param {string} [defaultCodeLang]
+ * @param {{ onEditCodeBlock?: (index: number, newCode: string) => Promise<boolean> }} [options]
  * @returns {HTMLElement}
  */
-export function renderMarkdown(markdown, defaultCodeLang = "") {
+export function renderMarkdown(markdown, defaultCodeLang = "", options = {}) {
   const root = document.createElement("div");
   root.className = "md-body";
   if (!markdown || !markdown.trim()) {
@@ -134,6 +283,7 @@ export function renderMarkdown(markdown, defaultCodeLang = "") {
 
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   let i = 0;
+  let codeBlockIndex = 0;
 
   while (i < lines.length) {
     const line = lines[i];
@@ -164,7 +314,10 @@ export function renderMarkdown(markdown, defaultCodeLang = "") {
         i += 1;
       }
       if (i < lines.length) i += 1; // skip closing fence
-      root.appendChild(createCodeBlock(codeLines.join("\n"), lang));
+      root.appendChild(
+        createCodeBlock(codeLines.join("\n"), lang, codeBlockIndex, options.onEditCodeBlock)
+      );
+      codeBlockIndex += 1;
       continue;
     }
 

@@ -272,13 +272,24 @@ class StudyGuideStore:
             return data
         return None
 
-    def save_study_guide(self, qid: int, guide_md: str, model: str) -> dict[str, Any]:
-        payload = {
+    def save_study_guide(
+        self, qid: int, guide_md: str, model: str, edited: bool = False
+    ) -> dict[str, Any]:
+        now = int(time.time())
+        payload: dict[str, Any] = {
             "question_id": qid,
             "guide_md": guide_md,
             "model": model,
-            "generated_at": int(time.time()),
+            "generated_at": now,
         }
+        if edited:
+            existing = self.get_study_guide(qid)
+            if existing and existing.get("generated_at"):
+                payload["generated_at"] = existing["generated_at"]
+            if existing and existing.get("model"):
+                payload["model"] = existing["model"]
+            payload["edited"] = True
+            payload["edited_at"] = now
         with self._lock:
             self.backend.write_json(f"study_guides/{qid}.json", payload)
         return payload
