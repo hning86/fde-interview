@@ -36,7 +36,7 @@ const state = {
   filteredQuestions: [],
   activeQuestionId: null,
   activeQuestionDetail: null,
-  activeTab: "problem",
+  activeTab: "guide",
   filters: {
     query: "",
     status: "all",
@@ -727,7 +727,7 @@ async function openQuestion(qid) {
   const q = await res.json();
   state.activeQuestionDetail = q;
   renderQuestionDetail();
-  setActiveTab("problem");
+  setActiveTab("guide");
   loadChatThread(qid);
   document.getElementById("main-content").scrollTo({ top: 0, behavior: "instant" });
 }
