@@ -121,7 +121,7 @@ class GeminiCoach:
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 temperature=0.4,
-                max_output_tokens=2048,
+                max_output_tokens=16384,
             ),
         )
         return (response.text or "").strip() or "I couldn't generate a response. Please try rephrasing."
@@ -159,7 +159,7 @@ class GeminiCoach:
                     "from Java/Go/C++ to idiomatic Python 3. Keep the translation faithful, bug-free, and concise."
                 ),
                 temperature=0.2,
-                max_output_tokens=4096,
+                max_output_tokens=16384,
             ),
         )
         return (response.text or "").strip()
